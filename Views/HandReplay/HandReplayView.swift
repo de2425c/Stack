@@ -58,7 +58,7 @@ struct HandReplayView: View {
                             Text(isPlaying ? "Reset" : "Start")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .frame(width: 100, height: 40)
+                                .frame(width: 100, height: 25)
                                 .background(Color(red: 123/255, green: 255/255, blue: 99/255))
                                 .cornerRadius(8)
                         }
@@ -67,7 +67,7 @@ struct HandReplayView: View {
                             Text("Next")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .frame(width: 100, height: 40)
+                                .frame(width: 100, height: 25)
                                 .background(Color(red: 123/255, green: 255/255, blue: 99/255))
                                 .opacity(isPlaying && hasMoreActions ? 1 : 0.5)
                                 .cornerRadius(8)
@@ -89,13 +89,16 @@ struct HandReplayView: View {
                                     .stroke(tableBorderColor, lineWidth: 8)
                             )
                             .shadow(color: .black.opacity(0.5), radius: 10)
+                            .frame(width: geometry.size.width * 0.9, height: geometry.size.height * 0.8)
+                            .position(x: geometry.size.width / 2, y: geometry.size.height * 0.36)
+
                         
                         // Stack Logo at the top
                         Text("STACK")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .opacity(0.3)
-                            .offset(y: -geometry.size.height * 0.3)
+                            .offset(y: -geometry.size.height * 0.25)
                         
                         // Pot display with label
                         if potAmount > 0 {
@@ -105,13 +108,13 @@ struct HandReplayView: View {
                                     .foregroundColor(.white.opacity(0.9))
                                 ChipView(amount: potAmount)
                             }
-                            .offset(x: -geometry.size.width * 0.05, y: -geometry.size.height * 0.05)
+                            .offset(x: -geometry.size.width * 0, y: -geometry.size.height * 0.18)
                         }
                         
                         // Community Cards - moved slightly left
                         if currentStreetIndex >= 0 {
                             CommunityCardsView(cards: allCommunityCards)
-                                .offset(x: -geometry.size.width * 0.05, y: geometry.size.height * 0.1)
+                                .offset(x: -geometry.size.width * 0.05, y: geometry.size.height * 0)
                         }
                         
                         // Player Seats
@@ -252,15 +255,15 @@ struct PlayerSeatView: View {
         // Moved everything slightly left (0.5 -> 0.45 for center)
         // Evenly spread positions
         let positions = [
-            CGPoint(x: width * 0.45, y: height * 0.75),  // 0: Hero (bottom center)
-            CGPoint(x: width * 0.15, y: height * 0.75),  // 1: Bottom left (small blind)
-            CGPoint(x: width * 0.15, y: height * 0.55),  // 2: Left bottom (big blind)
-            CGPoint(x: width * 0.15, y: height * 0.35),  // 3: Left top (utg)
-            CGPoint(x: width * 0.45, y: height * 0.2),   // 4: Top left (utg+1)
-            CGPoint(x: width * 0.75, y: height * 0.2),   // 5: Top right (utg+2)
-            CGPoint(x: width * 0.75, y: height * 0.35),  // 6: Right top (lojack)
-            CGPoint(x: width * 0.75, y: height * 0.55),  // 7: Right bottom (hijack)
-            CGPoint(x: width * 0.75, y: height * 0.75),  // 8: Bottom right (cutoff)
+            CGPoint(x: width * 0.5, y: height * 0.7),  // 0: Hero (bottom center)
+            CGPoint(x: width * 0.15, y: height * 0.57),  // 1: Bottom left (small blind)
+            CGPoint(x: width * 0.15, y: height * 0.37),  // 2: Left bottom (big blind)
+            CGPoint(x: width * 0.15, y: height * 0.17),  // 3: Left top (utg)
+            CGPoint(x: width * 0.35, y: height * 0.05),   // 4: Top left (utg+1)
+            CGPoint(x: width * 0.65, y: height * 0.05),   // 5: Top right (utg+2)
+            CGPoint(x: width * 0.85, y: height * 0.17),  // 6: Right top (lojack)
+            CGPoint(x: width * 0.85, y: height * 0.37),  // 7: Right bottom (hijack)
+            CGPoint(x: width * 0.85, y: height * 0.57),  // 8: Bottom right (cutoff)
         ]
         
         if isHero {
