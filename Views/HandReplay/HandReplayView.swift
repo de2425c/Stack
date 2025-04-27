@@ -58,7 +58,7 @@ struct HandReplayView: View {
                             Text(isPlaying ? "Reset" : "Start")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .frame(width: 100, height: 25)
+                                .frame(width: 100, height: 30)
                                 .background(Color(red: 123/255, green: 255/255, blue: 99/255))
                                 .cornerRadius(8)
                         }
@@ -67,14 +67,14 @@ struct HandReplayView: View {
                             Text("Next")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.black)
-                                .frame(width: 100, height: 25)
+                                .frame(width: 100, height: 30)
                                 .background(Color(red: 123/255, green: 255/255, blue: 99/255))
                                 .opacity(isPlaying && hasMoreActions ? 1 : 0.5)
                                 .cornerRadius(8)
                         }
                         .disabled(!isPlaying || !hasMoreActions)
                     }
-                    .padding(.top, 24) // Plenty of space from the top
+                    .padding(.top, 15) // Plenty of space from the top
                     .zIndex(1) // Always on top
                     
                     Spacer(minLength: 16) // Space between buttons and table
@@ -88,19 +88,18 @@ struct HandReplayView: View {
                                 RoundedRectangle(cornerRadius: 25)
                                     .stroke(tableBorderColor, lineWidth: 8)
                             )
+                            .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.83)
+                            .position(x: geometry.size.width / 2, y: geometry.size.height * 0.35)
                             .shadow(color: .black.opacity(0.5), radius: 10)
-                            .frame(width: geometry.size.width * 0.9, height: geometry.size.height * 0.8)
-                            .position(x: geometry.size.width / 2, y: geometry.size.height * 0.36)
-
                         
-                        // Stack Logo at the top
+                        // Stack Logo - moved up
                         Text("STACK")
                             .font(.system(size: 24, weight: .bold))
                             .foregroundColor(.white)
                             .opacity(0.3)
-                            .offset(y: -geometry.size.height * 0.25)
-                        
-                        // Pot display with label
+                            .offset(y: -geometry.size.height * 0.31) // right below top players
+
+                        // Pot display - centered
                         if potAmount > 0 {
                             VStack(spacing: 4) {
                                 Text("Pot")
@@ -108,15 +107,13 @@ struct HandReplayView: View {
                                     .foregroundColor(.white.opacity(0.9))
                                 ChipView(amount: potAmount)
                             }
-                            .offset(x: -geometry.size.width * 0, y: -geometry.size.height * 0.18)
+                            .offset(y: -geometry.size.height * 0.22)
                         }
-                        
-                        // Community Cards - moved slightly left
-                        if currentStreetIndex >= 0 {
-                            CommunityCardsView(cards: allCommunityCards)
-                                .offset(x: -geometry.size.width * 0.05, y: geometry.size.height * 0)
-                        }
-                        
+
+                        // Community Cards - centered, a bit below the pot
+                        CommunityCardsView(cards: allCommunityCards)
+                            .offset(y: -geometry.size.height * 0.1) // adjust as needed
+
                         // Player Seats
                         ForEach(hand.raw.players, id: \.seat) { player in
                             PlayerSeatView(
@@ -191,15 +188,37 @@ struct HandReplayView: View {
 
 struct CommunityCardsView: View {
     let cards: [String]
-    
+
     var body: some View {
-        // Simple horizontal layout, all cards side by side
-        HStack(spacing: 4) {
-            ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
-                CardView(card: Card(from: card))
-                    .frame(width: 35, height: 50)
+        HStack {
+            Spacer()
+            VStack(spacing: 6) {
+                // Flop
+                if cards.count >= 3 {
+                    HStack(spacing: 8) {
+                        ForEach(0..<3, id: \.self) { idx in
+                            if idx < cards.count {
+                                CardView(card: Card(from: cards[idx]))
+                                    .frame(width: 32, height: 46)
+                            }
+                        }
+                    }
+                }
+                // Turn and River
+                HStack(spacing: 8) {
+                    if cards.count >= 4 {
+                        CardView(card: Card(from: cards[3]))
+                            .frame(width: 32, height: 46)
+                    }
+                    if cards.count >= 5 {
+                        CardView(card: Card(from: cards[4]))
+                            .frame(width: 32, height: 46)
+                    }
+                }
             }
+            Spacer()
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -256,14 +275,14 @@ struct PlayerSeatView: View {
         // Evenly spread positions
         let positions = [
             CGPoint(x: width * 0.5, y: height * 0.7),  // 0: Hero (bottom center)
-            CGPoint(x: width * 0.15, y: height * 0.57),  // 1: Bottom left (small blind)
-            CGPoint(x: width * 0.15, y: height * 0.37),  // 2: Left bottom (big blind)
-            CGPoint(x: width * 0.15, y: height * 0.17),  // 3: Left top (utg)
+            CGPoint(x: width * 0.18, y: height * 0.6),  // 1: Bottom left (small blind)
+            CGPoint(x: width * 0.18, y: height * 0.4),  // 2: Left bottom (big blind)
+            CGPoint(x: width * 0.18, y: height * 0.2),  // 3: Left top (utg)
             CGPoint(x: width * 0.35, y: height * 0.05),   // 4: Top left (utg+1)
             CGPoint(x: width * 0.65, y: height * 0.05),   // 5: Top right (utg+2)
-            CGPoint(x: width * 0.85, y: height * 0.17),  // 6: Right top (lojack)
-            CGPoint(x: width * 0.85, y: height * 0.37),  // 7: Right bottom (hijack)
-            CGPoint(x: width * 0.85, y: height * 0.57),  // 8: Bottom right (cutoff)
+            CGPoint(x: width * 0.82, y: height * 0.2),  // 6: Right top (lojack)
+            CGPoint(x: width * 0.82, y: height * 0.4),  // 7: Right bottom (hijack)
+            CGPoint(x: width * 0.82, y: height * 0.6),  // 8: Bottom right (cutoff)
         ]
         
         if isHero {
@@ -283,37 +302,74 @@ struct PlayerSeatView: View {
     var body: some View {
         let position = getPosition()
         
-        VStack(spacing: 4) {
-            // Position indicator with better visibility
-            Text(player.position ?? "")
-                .font(.system(size: 12))
-                .foregroundColor(.white.opacity(0.9))  // Increased opacity
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.black.opacity(0.3))  // Added background
-                .cornerRadius(4)
-            
-            // Player name
-            Text(player.name)
-                .font(.system(size: 14, weight: isHero ? .bold : .regular))
-                .foregroundColor(.white)
-            
-            // Stack amount
-            ChipView(amount: stack)
-                .frame(width: 40, height: 40)
-            
-            // Cards
-            if let cards = player.cards, !cards.isEmpty {
-                HStack(spacing: -5) {
-                    ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
-                        CardView(card: Card(from: card))
-                            .frame(width: 30, height: 45)
+        // Sizes for hero vs others
+        let cardWidth: CGFloat = isHero ? 38 : 28
+        let cardHeight: CGFloat = isHero ? 56 : 40
+        let rectWidth: CGFloat = isHero ? 100 : 70
+        let rectHeight: CGFloat = isHero ? 54 : 36
+        let fontSize: CGFloat = isHero ? 17 : 13
+        let stackFontSize: CGFloat = isHero ? 15 : 11
+        let cardOffset: CGFloat = isHero ? -38 : -28
+        
+        ZStack {
+            // Cards peeking out from the TOP of the rectangle, always shown unless folded
+            if showCards && !isFolded {
+                HStack(spacing: isHero ? 12 : 7) {
+                    if isHero, let cards = player.cards, cards.count == 2 {
+                        ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+                            CardView(card: Card(from: card))
+                                .frame(width: cardWidth, height: cardHeight)
+                        }
+                    } else {
+                        ForEach(0..<2, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: isHero ? 7 : 5)
+                                .fill(Color.gray.opacity(0.5))
+                                .frame(width: cardWidth, height: cardHeight)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: isHero ? 7 : 5)
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                )
+                        }
                     }
                 }
+                .offset(y: isHero ? -32 : cardOffset) // Move hero's cards up a bit more
+                .zIndex(0)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.3), value: showCards)
+            }
+            
+            // Player info rectangle
+            VStack(spacing: isHero ? 8 : 4) {
+                Text(displayName)
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Text(String(format: "$%.2f", stack))
+                    .font(.system(size: stackFontSize, weight: .regular))
+                    .foregroundColor(.white.opacity(0.9))
+            }
+            .frame(width: rectWidth, height: rectHeight)
+            .background(
+                RoundedRectangle(cornerRadius: isHero ? 13 : 10)
+                    .fill(Color.black.opacity(0.8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: isHero ? 13 : 10)
+                            .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+            )
+            .zIndex(1)
+            .opacity(isFolded ? 0.5 : 1.0)
+        }
+        .position(x: position.x, y: position.y)
+        .onAppear {
+            showCards = true // Always start with cards visible
+        }
+        .onChange(of: isFolded) { folded in
+            withAnimation {
+                showCards = !folded
             }
         }
-        .opacity(isFolded ? 0.5 : 1.0)
-        .position(x: position.x, y: position.y)
     }
 }
 
