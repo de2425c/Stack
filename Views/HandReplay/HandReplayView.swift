@@ -26,6 +26,10 @@ struct HandReplayView: View {
     @State private var playerStacks: [String: Double] = [:]
     @State private var foldedPlayers: Set<String> = []
     @State private var isHandComplete = false
+    @State private var playerBets: [String: Double] = [:]
+    @State private var showdownRevealed = false
+    @State private var winningPlayers: Set<String> = []
+    @State private var showPotDistribution = false
     
     private let tableColor = Color(red: 45/255, green: 120/255, blue: 65/255)
     private let tableBorderColor = Color(red: 74/255, green: 54/255, blue: 38/255)
@@ -43,6 +47,12 @@ struct HandReplayView: View {
             cards.append(contentsOf: hand.raw.streets[i].cards)
         }
         return cards
+    }
+    
+    private var isShowdown: Bool {
+        guard currentStreetIndex == hand.raw.streets.count - 1 else { return false }
+        let currentStreet = hand.raw.streets[currentStreetIndex]
+        return currentActionIndex >= currentStreet.actions.count
     }
     
     var body: some View {
@@ -82,10 +92,10 @@ struct HandReplayView: View {
                     // Poker Table
                     ZStack {
                         // Table background
-                        RoundedRectangle(cornerRadius: 25)
+                        Ellipse()
                             .fill(tableColor)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 25)
+                                Ellipse()
                                     .stroke(tableBorderColor, lineWidth: 8)
                             )
                             .frame(width: geometry.size.width * 0.93, height: geometry.size.height * 0.83)
@@ -122,7 +132,11 @@ struct HandReplayView: View {
                                 isHero: player.isHero,
                                 stack: playerStacks[player.name] ?? player.stack,
                                 geometry: geometry,
-                                allPlayers: hand.raw.players
+                                allPlayers: hand.raw.players,
+                                betAmount: playerBets[player.name],
+                                showdownRevealed: showdownRevealed,
+                                isWinner: winningPlayers.contains(player.name),
+                                showPotDistribution: showPotDistribution
                             )
                         }
                     }
@@ -148,7 +162,31 @@ struct HandReplayView: View {
         isHandComplete = false
         potAmount = 0
         foldedPlayers.removeAll()
+        playerBets.removeAll()
         initializeStacks()
+        
+        // Set initial blind amounts
+        if hand.raw.streets.count > 0 && hand.raw.streets[0].actions.count >= 2 {
+            let preflop = hand.raw.streets[0]
+            
+            // Find small blind action
+            if let sbAction = preflop.actions.first(where: { $0.action.lowercased().contains("small blind") }) {
+                playerBets[sbAction.playerName] = sbAction.amount
+                if let stack = playerStacks[sbAction.playerName] {
+                    playerStacks[sbAction.playerName] = stack - sbAction.amount
+                }
+                potAmount += sbAction.amount
+            }
+            
+            // Find big blind action
+            if let bbAction = preflop.actions.first(where: { $0.action.lowercased().contains("big blind") }) {
+                playerBets[bbAction.playerName] = bbAction.amount
+                if let stack = playerStacks[bbAction.playerName] {
+                    playerStacks[bbAction.playerName] = stack - bbAction.amount
+                }
+                potAmount += bbAction.amount
+            }
+        }
     }
     
     private func nextAction() {
@@ -164,11 +202,21 @@ struct HandReplayView: View {
                 switch action.action.lowercased() {
                 case "folds":
                     foldedPlayers.insert(action.playerName)
-                case "bets", "raises", "calls":
+                    playerBets[action.playerName] = 0
+                case "bets", "raises":
                     if let stack = playerStacks[action.playerName] {
                         playerStacks[action.playerName] = stack - action.amount
                         potAmount += action.amount
+                        playerBets[action.playerName] = action.amount
                     }
+                case "calls":
+                    if let stack = playerStacks[action.playerName] {
+                        playerStacks[action.playerName] = stack - action.amount
+                        potAmount += action.amount
+                        playerBets[action.playerName] = action.amount
+                    }
+                case "small blind", "big blind":
+                    break
                 default:
                     break
                 }
@@ -177,11 +225,35 @@ struct HandReplayView: View {
             } else if currentStreetIndex + 1 < hand.raw.streets.count {
                 currentStreetIndex += 1
                 currentActionIndex = 0
+                playerBets.removeAll()
             } else {
+                // Handle showdown
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    showdownRevealed = true
+                }
+                
+                // Determine winners and distribute pot
+                if let distribution = hand.raw.pot.distribution {
+                    winningPlayers = Set(distribution.filter { $0.amount > 0 }.map { $0.playerName })
+                    
+                    // Animate pot distribution after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            showPotDistribution = true
+                            
+                            // Update player stacks with winnings
+                            for potDist in distribution {
+                                if let currentStack = playerStacks[potDist.playerName] {
+                                    playerStacks[potDist.playerName] = currentStack + potDist.amount
+                                }
+                            }
+                            potAmount = 0
+                        }
+                    }
+                }
+                
                 isHandComplete = true
             }
-        } else {
-            isHandComplete = true
         }
     }
 }
@@ -260,6 +332,10 @@ struct PlayerSeatView: View {
     let stack: Double
     let geometry: GeometryProxy
     let allPlayers: [Player]
+    let betAmount: Double?
+    let showdownRevealed: Bool
+    let isWinner: Bool
+    let showPotDistribution: Bool
     
     @State private var showCards: Bool = true
     
@@ -274,15 +350,15 @@ struct PlayerSeatView: View {
         // Moved everything slightly left (0.5 -> 0.45 for center)
         // Evenly spread positions
         let positions = [
-            CGPoint(x: width * 0.5, y: height * 0.7),  // 0: Hero (bottom center)
-            CGPoint(x: width * 0.18, y: height * 0.6),  // 1: Bottom left (small blind)
-            CGPoint(x: width * 0.18, y: height * 0.4),  // 2: Left bottom (big blind)
-            CGPoint(x: width * 0.18, y: height * 0.2),  // 3: Left top (utg)
-            CGPoint(x: width * 0.35, y: height * 0.05),   // 4: Top left (utg+1)
-            CGPoint(x: width * 0.65, y: height * 0.05),   // 5: Top right (utg+2)
-            CGPoint(x: width * 0.82, y: height * 0.2),  // 6: Right top (lojack)
-            CGPoint(x: width * 0.82, y: height * 0.4),  // 7: Right bottom (hijack)
-            CGPoint(x: width * 0.82, y: height * 0.6),  // 8: Bottom right (cutoff)
+            CGPoint(x: width * 0.5, y: height * 0.72),  // 0: Hero (bottom center)
+            CGPoint(x: width * 0.12, y: height * 0.62),  // 1: Bottom left
+            CGPoint(x: width * 0.08, y: height * 0.4),  // 2: Left middle
+            CGPoint(x: width * 0.12, y: height * 0.2),  // 3: Left top
+            CGPoint(x: width * 0.3, y: height * 0.05),   // 4: Top middle left
+            CGPoint(x: width * 0.7, y: height * 0.05),   // 5: Top middle right
+            CGPoint(x: width * 0.88, y: height * 0.2),  // 6: Right top
+            CGPoint(x: width * 0.92, y: height * 0.4),  // 7: Right middle
+            CGPoint(x: width * 0.88, y: height * 0.62),  // 8: Bottom right )
         ]
         
         if isHero {
@@ -299,10 +375,56 @@ struct PlayerSeatView: View {
         return positions[positionIndex]
     }
     
+    private func getBetPosition() -> CGPoint {
+        let width = geometry.size.width
+        let height = geometry.size.height
+        let centerX = width * 0.5
+        let centerY = height * 0.35 // Approximate center of the table
+        
+        // Get the player's current position
+        let pos = getPosition()
+        
+        // Special handling for hero's bet - place it to the right
+        if isHero {
+            return CGPoint(x: pos.x + 65, y: pos.y) // Increased spacing from 50 to 65
+        }
+        
+        // Calculate vector from center to player
+        let vectorX = pos.x - centerX
+        let vectorY = pos.y - centerY
+        
+        // Normalize the vector
+        let length = sqrt(vectorX * vectorX + vectorY * vectorY)
+        let normalizedX = vectorX / length
+        let normalizedY = vectorY / length
+        
+        // Increased bet distance for more spacing
+        let betDistance: CGFloat = 55 // Increased from 40 to 55
+        let betX = pos.x - (normalizedX * betDistance)
+        let betY = pos.y - (normalizedY * betDistance)
+        
+        return CGPoint(x: betX, y: betY)
+    }
+    
+    private var shouldShowCards: Bool {
+        if isHero {
+            return !isFolded && player.cards != nil
+        } else {
+            // Show villain's cards if:
+            // 1. They haven't folded
+            // 2. We're at showdown
+            // 3. They have cards to show (either hole cards or final cards)
+            // 4. They won or showed their cards
+            return !isFolded && showdownRevealed && 
+                   ((player.finalCards != nil && !player.finalCards!.isEmpty) || 
+                    (isWinner && player.cards != nil))
+        }
+    }
+    
     var body: some View {
         let position = getPosition()
+        let betPosition = getBetPosition()
         
-        // Sizes for hero vs others
         let cardWidth: CGFloat = isHero ? 38 : 28
         let cardHeight: CGFloat = isHero ? 56 : 40
         let rectWidth: CGFloat = isHero ? 100 : 70
@@ -312,58 +434,84 @@ struct PlayerSeatView: View {
         let cardOffset: CGFloat = isHero ? -38 : -28
         
         ZStack {
-            // Cards peeking out from the TOP of the rectangle, always shown unless folded
-            if showCards && !isFolded {
-                HStack(spacing: isHero ? 12 : 7) {
-                    if isHero, let cards = player.cards, cards.count == 2 {
-                        ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
-                            CardView(card: Card(from: card))
-                                .frame(width: cardWidth, height: cardHeight)
+            // Main content in a separate ZStack for proper layering
+            ZStack {
+                // Cards first (will be behind player info but above table)
+                if shouldShowCards {
+                    HStack(spacing: isHero ? 12 : 7) {
+                        if let finalCards = player.finalCards, !finalCards.isEmpty {
+                            // Show final cards if available (for mucked hands that were shown)
+                            ForEach(Array(finalCards.enumerated()), id: \.offset) { index, card in
+                                CardView(card: Card(from: card))
+                                    .frame(width: cardWidth, height: cardHeight)
+                            }
+                        } else if let cards = player.cards, cards.count == 2 {
+                            // Show hole cards
+                            ForEach(Array(cards.enumerated()), id: \.offset) { index, card in
+                                CardView(card: Card(from: card))
+                                    .frame(width: cardWidth, height: cardHeight)
+                            }
                         }
-                    } else {
+                    }
+                    .offset(y: isHero ? -32 : cardOffset)
+                    .zIndex(1)  // Above table, below player rectangle
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.3), value: showCards)
+                } else if !isFolded {
+                    // Back of cards
+                    HStack(spacing: isHero ? 12 : 7) {
                         ForEach(0..<2, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: isHero ? 7 : 5)
-                                .fill(Color.gray.opacity(0.5))
+                                .fill(Color.gray)
                                 .frame(width: cardWidth, height: cardHeight)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: isHero ? 7 : 5)
-                                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        .stroke(Color.white, lineWidth: 1)
                                 )
                         }
                     }
+                    .offset(y: isHero ? -32 : cardOffset)
+                    .zIndex(1)
                 }
-                .offset(y: isHero ? -32 : cardOffset) // Move hero's cards up a bit more
-                .zIndex(0)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.3), value: showCards)
+                
+                // Player info rectangle on top
+                VStack(spacing: isHero ? 8 : 4) {
+                    Text(displayName)
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    Text(String(format: "$%.0f", stack))
+                        .font(.system(size: stackFontSize))
+                        .foregroundColor(isWinner ? .green : .white.opacity(0.9))
+                }
+                .frame(width: rectWidth, height: rectHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: isHero ? 13 : 10)
+                        .fill(Color.black.opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: isHero ? 13 : 10)
+                                .stroke(isWinner ? Color.green : Color.white.opacity(0.7), lineWidth: isWinner ? 2 : 1)
+                        )
+                        .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                )
+                .scaleEffect(isWinner && showPotDistribution ? 1.1 : 1.0)
+                .animation(.spring(response: 0.3), value: isWinner && showPotDistribution)
+                .zIndex(2)  // Highest z-index for player info
+                .opacity(isFolded ? 0.5 : 1.0)
             }
+            .position(x: position.x, y: position.y)
             
-            // Player info rectangle
-            VStack(spacing: isHero ? 8 : 4) {
-                Text(displayName)
-                    .font(.system(size: fontSize, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                Text(String(format: "$%.2f", stack))
-                    .font(.system(size: stackFontSize, weight: .regular))
-                    .foregroundColor(.white.opacity(0.9))
+            // Bet amount in separate layer
+            if let bet = betAmount, bet > 0 {
+                ChipView(amount: bet)
+                    .scaleEffect(0.8)
+                    .position(x: betPosition.x, y: betPosition.y)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(3)  // Always on top
             }
-            .frame(width: rectWidth, height: rectHeight)
-            .background(
-                RoundedRectangle(cornerRadius: isHero ? 13 : 10)
-                    .fill(Color.black.opacity(0.8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: isHero ? 13 : 10)
-                            .stroke(Color.white.opacity(0.7), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
-            )
-            .zIndex(1)
-            .opacity(isFolded ? 0.5 : 1.0)
         }
-        .position(x: position.x, y: position.y)
         .onAppear {
-            showCards = true // Always start with cards visible
+            showCards = true
         }
         .onChange(of: isFolded) { folded in
             withAnimation {

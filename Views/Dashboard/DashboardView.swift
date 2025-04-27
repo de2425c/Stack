@@ -128,9 +128,9 @@ struct HandsTab: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(handStore.savedHands, id: \.raw.gameInfo.dealerSeat) { hand in
-                    NavigationLink(destination: HandReplayView(hand: hand)) {
-                        HandSummaryRow(hand: hand)
+                ForEach(handStore.savedHands) { savedHand in
+                    NavigationLink(destination: HandReplayView(hand: savedHand.hand)) {
+                        HandSummaryRow(hand: savedHand.hand)
                             .background(Color(UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0)))
                             .cornerRadius(12)
                     }
@@ -150,50 +150,3 @@ struct SessionsTab: View {
     }
 }
 
-struct HandSummaryRow: View {
-    let hand: ParsedHandHistory
-    
-    private var heroWon: Bool {
-        guard let distribution = hand.raw.pot.distribution,
-              let hero = hand.raw.players.first(where: { $0.isHero }) else {
-            return false
-        }
-        return distribution.contains { potDist in
-            potDist.playerName == hero.name && potDist.amount > 0
-        }
-    }
-    
-    private var roundedSmallBlind: Int {
-        Int(floor(hand.raw.gameInfo.smallBlind))
-    }
-    
-    private var roundedBigBlind: Int {
-        Int(floor(hand.raw.gameInfo.bigBlind))
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Blinds \(roundedSmallBlind)/\(roundedBigBlind)")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Spacer()
-                Text("Pot: $\(hand.raw.pot.amount, specifier: "%.0f")")
-                    .foregroundColor(heroWon ? .green : .red)
-                    .font(.headline)
-            }
-            
-            if let hero = hand.raw.players.first(where: { $0.isHero }) {
-                Text("Position: \(hero.position ?? "Unknown")")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                if let cards = hero.cards {
-                    Text("Cards: \(cards.joined(separator: " "))")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-        .padding()
-    }
-} 

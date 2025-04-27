@@ -91,4 +91,10 @@ struct PotDistribution: Codable {
         case playerName = "player_name"
         case amount, hand, cards
     }
+}
+
+struct SavedHand: Identifiable {
+    let id: String  // Firestore document ID
+    let hand: ParsedHandHistory
+    let timestamp: Date
 } 

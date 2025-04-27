@@ -2,9 +2,9 @@ import Foundation
 import FirebaseFirestore
 
 class HandStore: ObservableObject {
-    @Published var savedHands: [ParsedHandHistory] = []
+    @Published var savedHands: [SavedHand] = []
+    let userId: String
     private let db = Firestore.firestore()
-    private let userId: String
     
     init(userId: String) {
         self.userId = userId
@@ -38,10 +38,20 @@ class HandStore: ObservableObject {
                 self?.savedHands = documents.compactMap { document in
                     guard let dict = document.data()["hand"] as? [String: Any],
                           let data = try? JSONSerialization.data(withJSONObject: dict),
-                          let hand = try? JSONDecoder().decode(ParsedHandHistory.self, from: data)
-                    else { return nil }
-                    return hand
+                          let hand = try? JSONDecoder().decode(ParsedHandHistory.self, from: data),
+                          let timestamp = document.data()["timestamp"] as? Timestamp
+                    else {
+                        print("Error decoding hand from document: \(document.documentID)")
+                        return nil
+                    }
+                    return SavedHand(
+                        id: document.documentID,
+                        hand: hand,
+                        timestamp: timestamp.dateValue()
+                    )
                 }
+                
+                print("Loaded \(self?.savedHands.count ?? 0) hands")
             }
     }
 } 
